@@ -2,16 +2,75 @@ local M = {}
 
 
 function M.mysqlToValueObject()
-    local currentBuffer = vim.api.nvim_get_current_buf()
 
-    local startSelection = vim.api.nvim_buf_get_mark(currentBuffer, "<")
-    local endSelection = vim.api.nvim_buf_get_mark(currentBuffer, ">")
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", true)
+
+      local currentBuffer = vim.api.nvim_get_current_buf()
 
 
-    for i = startSelection[1], endSelection[1] do
-        local line = vim.fn.getline(i)
-    end
+      local startSelection = vim.api.nvim_buf_get_mark(currentBuffer, "<")[1]
+      local endSelection = vim.api.nvim_buf_get_mark(currentBuffer, ">")[1]
+      local lineCnt = endSelection-startSelection
 
+      if lineCnt == 0 then
+            lineCnt = 1
+      end
+
+      vim.api.nvim_command("normal! " .. tostring(startSelection) .. "G")
+
+      for i=startSelection, endSelection do
+
+            local text = vim.api.nvim_get_current_line()
+            local position = text:find('%(')
+
+            if position == nil then
+                  vim.api.nvim_command("normal! 0f`;eld$a ")
+            else
+                  vim.api.nvim_command("normal! 0f(d$a ")
+            end
+
+            vim.api.nvim_command("normal! 0f`lvex$pA;")
+            vim.api.nvim_command("normal! ^3xiprivate ")
+
+            if text:find('[vV][aA][rR][cC][hH][aA][rR]') then
+                  vim.api.nvim_command(tostring(i) .. " s/varchar/String/")
+            elseif text:find('[cC][hH][aA][rR]') then
+                  vim.api.nvim_command(tostring(i) .. " s/char/String/")
+            elseif text:find('[bB][iI][gG][iI][nN][tT]') then
+                  vim.api.nvim_command(tostring(i) .. " s/bigint/long/")
+            elseif text:find('[tT][iI][nN][yY][iI][nN][tT]') then
+                  vim.api.nvim_command(tostring(i) .. " s/tinyint/int/")
+            elseif text:find('[dD][eE][cC][iI][mM][aA][lL]') then
+                  vim.api.nvim_command(tostring(i) .. " s/decimal/float/")
+            elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
+                  vim.api.nvim_command(tostring(i) .. " s/datetime/String/")
+            end
+
+            vim.api.nvim_command('normal! $b')
+            local cursor = vim.api.nvim_win_get_cursor(0)
+
+            text = vim.api.nvim_get_current_line()
+
+            local startCol, endCol = text:find("[%a_]+", cursor[2]+1)
+            local variableName = startCol and text:sub(startCol, endCol):lower()
+
+
+            vim.api.nvim_command("normal! $bvexi" .. variableName)
+
+
+            while true do
+                  if text:find('_') then
+                        vim.api.nvim_command('normal! 0f_x~')
+                        text = vim.api.nvim_get_current_line()
+                  else
+                        break
+                  end
+            end
+
+            if i < endSelection then
+                  vim.api.nvim_command("normal! j")
+            end
+      end
 end
 
 function M.makeRequestMapping()
@@ -23,19 +82,19 @@ function M.makeRequestMapping()
 
       -- Find the start of the word
       while start_col > 0 and line:sub(start_col, start_col):match('%w') do
-          start_col = start_col - 1
+            start_col = start_col - 1
       end
 
       -- Find the end of the word
       while end_col <= #line and line:sub(end_col, end_col):match('%w') do
-          end_col = end_col + 1
+            end_col = end_col + 1
       end
 
       -- Extract the word
       local word = line:sub(start_col + 1, end_col - 1)
       if #word < 1 then
-        vim.notify("not found variable name under cursor", vim.log.levels.ERROR)
-        return
+            vim.notify("not found variable name under cursor", vim.log.levels.ERROR)
+            return
       end
 
       vim.api.nvim_command("normal! dd") -- delete variable name line
