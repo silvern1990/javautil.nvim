@@ -73,6 +73,81 @@ function M.mysqlToValueObject()
       end
 end
 
+
+function M.mysqlToObjectMapper()
+
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", true)
+
+      local currentBuffer = vim.api.nvim_get_current_buf()
+
+
+      local startSelection = vim.api.nvim_buf_get_mark(currentBuffer, "<")[1]
+      local endSelection = vim.api.nvim_buf_get_mark(currentBuffer, ">")[1]
+      local lineCnt = endSelection-startSelection
+
+      if lineCnt == 0 then
+            lineCnt = 1
+      end
+
+      vim.api.nvim_command("normal! " .. tostring(startSelection) .. "G")
+
+      for i=startSelection, endSelection do
+
+            local text = vim.api.nvim_get_current_line()
+            local position = text:find('%(')
+
+            if position == nil then
+                  vim.api.nvim_command("normal! 0f`;eld$a ")
+            else
+                  vim.api.nvim_command("normal! 0f(d$a ")
+            end
+
+
+            if text:find('[vV][aA][rR][cC][hH][aA][rR]') then
+                  vim.api.nvim_command(tostring(i) .. " s/varchar/rs.getString(/")
+            elseif text:find('[cC][hH][aA][rR]') then
+                  vim.api.nvim_command(tostring(i) .. " s/char/rs.getString(/")
+            elseif text:find('[bB][iI][gG][iI][nN][tT]') then
+                  vim.api.nvim_command(tostring(i) .. " s/bigint/rs.getLong(/")
+            elseif text:find('[tT][iI][nN][yY][iI][nN][tT]') then
+                  vim.api.nvim_command(tostring(i) .. " s/tinyint/rs.getInt(/")
+            elseif text:find('[iI][nN][tT]') then
+                  vim.api.nvim_command(tostring(i) .. " s/int/rs.getInt(")
+            elseif text:find('[dD][eE][cC][iI][mM][aA][lL]') then
+                  vim.api.nvim_command(tostring(i) .. " s/decimal/float/rs.getFloat(/")
+            elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
+                  vim.api.nvim_command(tostring(i) .. " s/datetime/rs.getString(/")
+            end
+
+            local cursor = vim.api.nvim_win_get_cursor(0)
+
+            text = vim.api.nvim_get_current_line()
+
+            vim.api.nvim_command("normal! 0f`w")
+
+
+            local startCol, endCol = text:find("[%a_]+", cursor[2]+1)
+            local variableName = startCol and text:sub(startCol, endCol):lower()
+
+            while true do
+                  if text:find('_') then
+                        vim.api.nvim_command('normal! 0f_x~')
+                        text = vim.api.nvim_get_current_line()
+                  else
+                        break
+                  end
+            end
+
+            vim.api.nvim_command('normal! A' .. variableName)
+            vim.api.nvim_command('normal! ^xf`r(lxf r"ea"));')
+            vim.api.nvim_command('normal! ^~^iobj.set')
+
+            if i < endSelection then
+                  vim.api.nvim_command("normal! j")
+            end
+      end
+end
+
 function M.makeRequestMapping()
       -- Function to get the word under the cursor
       local line = vim.fn.getline('.')
