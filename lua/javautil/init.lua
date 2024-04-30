@@ -117,6 +117,8 @@ function M.mysqlToObjectMapper()
                   vim.api.nvim_command(tostring(i) .. " s/decimal/float/rs.getFloat(/")
             elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
                   vim.api.nvim_command(tostring(i) .. " s/datetime/rs.getString(/")
+            elseif text:find('[tT][iI][mM][eE]') then
+                  vim.api.nvim_command(tostring(i) .. " s/time/rs.getString(/")
             end
 
             local cursor = vim.api.nvim_win_get_cursor(0)
