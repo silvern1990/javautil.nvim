@@ -23,7 +23,7 @@ function M.mysqlToValueObject()
             local text = vim.api.nvim_get_current_line()
             local position = text:find('%(')
 
-            if position == nil then
+            if position == nil or text:find('current_timestamp') then
                   vim.api.nvim_command("normal! 0f`;eld$a ")
             else
                   vim.api.nvim_command("normal! 0f(d$a ")
@@ -44,6 +44,8 @@ function M.mysqlToValueObject()
                   vim.api.nvim_command(tostring(i) .. " s/decimal/float/")
             elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
                   vim.api.nvim_command(tostring(i) .. " s/datetime/String/")
+            elseif text:find('[tT][iI][mM][eE][sS][Tt][aA][mM][pP]') then
+                  vim.api.nvim_command(tostring(i) .. " s/timestamp/String/")
             end
 
             vim.api.nvim_command('normal! $b')
