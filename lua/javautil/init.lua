@@ -1,5 +1,51 @@
 local M = {}
 
+--
+-- INSERT 쿼리에서 컬럼 명 영역을 선택후 실행하면 클립보드에 #{value} 형태로 포맷팅 하여 저장한다.
+--
+function M.columnToMybatisValue()
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", true)
+
+      local currentBuffer = vim.api.nvim_get_current_buf()
+
+      local startSelection = vim.api.nvim_buf_get_mark(currentBuffer, "<")[1]
+      local endSelection = vim.api.nvim_buf_get_mark(currentBuffer, ">")[1]
+      local lineCnt = endSelection-startSelection
+
+      if lineCnt == 0 then
+            lineCnt = 1
+      end
+
+      vim.api.nvim_command("normal! " .. tostring(startSelection) .. "G")
+
+      local mybatis_values = ""
+
+      for i=startSelection, endSelection do
+            local text = vim.api.nvim_get_current_line()
+
+            for word in text:gmatch("%S+") do
+                  local mybatisValue, comma = word:gsub(',', '', 1)
+                  mybatisValue = mybatisValue:gsub('_%a', function(match)
+                        return match:sub(2):upper()
+                  end)
+
+                  mybatisValue = '#{' .. mybatisValue .. '}'
+                  if comma == 1 then
+                        mybatisValue = mybatisValue .. ', '
+                  else
+                        mybatisValue = mybatisValue .. '\n'
+                  end
+
+                  mybatis_values = mybatis_values .. mybatisValue
+            end
+
+            if i < endSelection then
+                  vim.api.nvim_command("normal! j")
+            end
+      end
+
+      vim.fn.setreg('+', mybatis_values)
+end
 
 function M.mysqlToValueObject()
 
@@ -180,5 +226,6 @@ function M.makeRequestMapping()
 
       vim.cmd('Template var=' .. word .. ' mapping')
 end
+
 
 return M
