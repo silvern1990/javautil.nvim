@@ -117,7 +117,7 @@ function M.mysqlToValueObject()
                   word = word:gsub(word, 'float')
             end
 
-            new_text = before_text .. ' ' .. word .. ' ' .. after_text
+            local new_text = before_text .. ' ' .. word .. ' ' .. after_text
 
             vim.fn.setline(vim.api.nvim_win_get_cursor(0)[1], new_text)
 
@@ -169,42 +169,63 @@ function M.mysqlToObjectMapper()
       for i=startSelection, endSelection do
 
             local text = vim.api.nvim_get_current_line()
+            local variable_name = text:match('`.*`'):gsub('`', '')
             local position = text:find('%(')
 
+
             if position == nil then
-                  vim.api.nvim_command("normal! 0f`;eld$a ")
+                  vim.api.nvim_command("normal! 0f`;eld$a")
             else
-                  vim.api.nvim_command("normal! 0f(d$a ")
+                  vim.api.nvim_command("normal! 0f(d$a")
+            end
+
+            vim.api.nvim_command("normal! b")
+
+            local line = vim.fn.getline('.')
+            local col = vim.fn.col('.')
+            local start_col = col
+            local end_col = col
+
+            -- Find the start of the word
+            while start_col > 0 and line:sub(start_col, start_col):match('%w') do
+                  start_col = start_col - 1
+            end
+
+            -- Find the end of the word
+            while end_col <= #line and line:sub(end_col, end_col):match('%w') do
+                  end_col = end_col + 1
+            end
+
+            -- Extract the word
+            local word = line:sub(start_col + 1, end_col - 1)
+            local before_text = line:sub(1, start_col-1)
+            local after_text = line:sub(end_col + 1)
+
+            local l_word = word:lower()
+
+            if l_word == 'varchar' or
+                  l_word == 'char' or 
+                  l_word == 'datetime' or
+                  l_word == 'time' or
+                  l_word == 'text'
+            then
+                  word = word:gsub(word, 'rs.getString("')
+            elseif l_word == 'bigint' then
+                  word = word:gsub(word, 'rs.getLong("')
+            elseif l_word == 'tinyint' or l_word == 'int' then
+                  word = word:gsub(word, 'rs.getInt("')
+            elseif l_word == 'decimal' then
+                  word = word:gsub(word, 'rs.getFloat("')
             end
 
 
-            if text:find('[vV][aA][rR][cC][hH][aA][rR]') then
-                  vim.api.nvim_command(tostring(i) .. " s/varchar/rs.getString(/")
-            elseif text:find('[cC][hH][aA][rR]') then
-                  vim.api.nvim_command(tostring(i) .. " s/char/rs.getString(/")
-            elseif text:find('[bB][iI][gG][iI][nN][tT]') then
-                  vim.api.nvim_command(tostring(i) .. " s/bigint/rs.getLong(/")
-            elseif text:find('[tT][iI][nN][yY][iI][nN][tT]') then
-                  vim.api.nvim_command(tostring(i) .. " s/tinyint/rs.getInt(/")
-            elseif text:find('[iI][nN][tT]') then
-                  vim.api.nvim_command(tostring(i) .. " s/int/rs.getInt(")
-            elseif text:find('[dD][eE][cC][iI][mM][aA][lL]') then
-                  vim.api.nvim_command(tostring(i) .. " s/decimal/float/rs.getFloat(/")
-            elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
-                  vim.api.nvim_command(tostring(i) .. " s/datetime/rs.getString(/")
-            elseif text:find('[tT][iI][mM][eE]') then
-                  vim.api.nvim_command(tostring(i) .. " s/time/rs.getString(/")
-            end
+            local new_text = before_text:lower() .. ' ' .. word .. after_text
 
-            local cursor = vim.api.nvim_win_get_cursor(0)
+            vim.fn.setline(vim.api.nvim_win_get_cursor(0)[1], new_text)
 
             text = vim.api.nvim_get_current_line()
 
             vim.api.nvim_command("normal! 0f`w")
-
-
-            local startCol, endCol = text:find("[%a_]+", cursor[2]+1)
-            local variableName = startCol and text:sub(startCol, endCol):lower()
 
             while true do
                   if text:find('_') then
@@ -215,8 +236,8 @@ function M.mysqlToObjectMapper()
                   end
             end
 
-            vim.api.nvim_command('normal! A' .. variableName)
-            vim.api.nvim_command('normal! ^xf`r(lxf r"ea"));')
+            vim.api.nvim_command('normal! A' .. variable_name)
+            vim.api.nvim_command('normal! ^xf`r(lxA"));')
             vim.api.nvim_command('normal! ^~^iobj.set')
 
             if i < endSelection then
