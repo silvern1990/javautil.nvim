@@ -77,29 +77,56 @@ function M.mysqlToValueObject()
 
             vim.api.nvim_command("normal! 0f`lvex$pA;")
             vim.api.nvim_command("normal! ^3xiprivate ")
+            vim.api.nvim_command("normal! w")
 
-            if text:find('[vV][aA][rR][cC][hH][aA][rR]') then
-                  vim.api.nvim_command(tostring(i) .. " s/varchar/String/")
-            elseif text:find('[cC][hH][aA][rR]') then
-                  vim.api.nvim_command(tostring(i) .. " s/char/String/")
-            elseif text:find('[bB][iI][gG][iI][nN][tT]') then
-                  vim.api.nvim_command(tostring(i) .. " s/bigint/long/")
-            elseif text:find('[tT][iI][nN][yY][iI][nN][tT]') then
-                  vim.api.nvim_command(tostring(i) .. " s/tinyint/int/")
-            elseif text:find('[dD][eE][cC][iI][mM][aA][lL]') then
-                  vim.api.nvim_command(tostring(i) .. " s/decimal/float/")
-            elseif text:find('[dD][aA][tT][eE][tT][iI][mM][eE]') then
-                  vim.api.nvim_command(tostring(i) .. " s/datetime/String/")
-            elseif text:find('[tT][iI][mM][eE][sS][Tt][aA][mM][pP]') then
-                  vim.api.nvim_command(tostring(i) .. " s/timestamp/String/")
+
+            local line = vim.fn.getline('.')
+            local col = vim.fn.col('.')
+            local start_col = col
+            local end_col = col
+
+            -- Find the start of the word
+            while start_col > 0 and line:sub(start_col, start_col):match('%w') do
+                  start_col = start_col - 1
             end
+
+            -- Find the end of the word
+            while end_col <= #line and line:sub(end_col, end_col):match('%w') do
+                  end_col = end_col + 1
+            end
+
+            -- Extract the word
+            local word = line:sub(start_col + 1, end_col - 1)
+            local before_text = line:sub(1, start_col-1)
+            local after_text = line:sub(end_col + 1)
+
+            local l_word = word:lower()
+            if l_word == 'varchar' 
+                  or l_word == 'char' 
+                  or l_word == 'text' 
+                  or l_word == 'datetime'
+                  or l_word == 'timestamp'
+                  or l_word == 'time'
+            then
+                  word = word:gsub(word, 'String')
+            elseif word:lower() == 'bigint' then
+                  word = word:gsub(word, 'long')
+            elseif word:lower() == 'tinyint' then
+                  word = word:gsub(word, 'int')
+            elseif word:lower() == 'decimal' then
+                  word = word:gsub(word, 'float')
+            end
+
+            new_text = before_text .. ' ' .. word .. ' ' .. after_text
+
+            vim.fn.setline(vim.api.nvim_win_get_cursor(0)[1], new_text)
 
             vim.api.nvim_command('normal! $b')
             local cursor = vim.api.nvim_win_get_cursor(0)
 
             text = vim.api.nvim_get_current_line()
 
-            local startCol, endCol = text:find("[%a%d_]+", cursor[2]+1)
+            local startCol, endCol = text:find("[%w_]+", cursor[2]+1)
             local variableName = startCol and text:sub(startCol, endCol):lower()
 
 
