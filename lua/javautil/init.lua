@@ -99,7 +99,7 @@ function M.mysqlToValueObject()
 
             text = vim.api.nvim_get_current_line()
 
-            local startCol, endCol = text:find("[%a_]+", cursor[2]+1)
+            local startCol, endCol = text:find("[%a%d_]+", cursor[2]+1)
             local variableName = startCol and text:sub(startCol, endCol):lower()
 
 
