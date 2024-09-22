@@ -173,7 +173,7 @@ function M.mysqlToObjectMapper()
             local position = text:find('%(')
 
 
-            if position == nil then
+            if position == nil or text:find('current_timestamp') then
                   vim.api.nvim_command("normal! 0f`;eld$a")
             else
                   vim.api.nvim_command("normal! 0f(d$a")
@@ -207,7 +207,8 @@ function M.mysqlToObjectMapper()
                   l_word == 'char' or 
                   l_word == 'datetime' or
                   l_word == 'time' or
-                  l_word == 'text'
+                  l_word == 'text' or
+                  l_word == 'timestamp'
             then
                   word = word:gsub(word, 'rs.getString("')
             elseif l_word == 'bigint' then
