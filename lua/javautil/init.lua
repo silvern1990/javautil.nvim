@@ -277,4 +277,19 @@ function M.makeRequestMapping()
 end
 
 
+function M.jump_to_mapper_xml()
+      local current_file = vim.fn.expand("%:t")
+      local method = vim.fn.expand("<cword>")
+
+      local mapper_name = current_file:gsub(".java", ".xml")
+      local search_dir = "src/main/resources"
+
+      require("telescope.builtin").grep_string({
+            search = 'id="' .. method .. '"',
+            search_dirs = { search_dir },
+            prompt_title = "Mybatis XML Jump",
+      })
+end
+
+
 return M
