@@ -299,6 +299,7 @@ end
 local function jump_to_file_line(filepath, linenr)
       vim.cmd("edit " .. filepath)
       vim.api.nvim_win_set_cursor(0, { linenr, 0 } )
+      vim.cmd('normal! zz')
 end
 
 function M.jump_to_mapper_xml()
