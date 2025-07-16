@@ -1,5 +1,10 @@
 local M = {}
 
+local root_dir = require("jdtls.setup").find_root({"mvnw", "gradlew", "pom.xml", "build.gradle"})
+
+local Job = require("plenary.job")
+local Path = require("plenary.path")
+
 --
 -- INSERT 쿼리에서 컬럼 명 영역을 선택후 실행하면 클립보드에 #{value} 형태로 포맷팅 하여 저장한다.
 --
@@ -281,7 +286,7 @@ end
 local function find_in_file(path, pattern)
       local match_line = nil
 
-      for linenr, line in ipairs(vim.fn.readfile(path)) do
+      for linenr, line in ipairs(vim.fn.readfile(Path:new(root_dir, path).absolute())) do
             if line:find(pattern, 1, true) then
                   match_line = linenr
                   break
@@ -303,7 +308,6 @@ function M.jump_to_mapper_xml()
       local mapper_name = current_file:gsub(".java", ".xml")
       local search_dir = "src/main/resources"
 
-      local Job = require("plenary.job")
       Job:new({
             command = "rg",
             args = { 'id="' .. method .. '"', "--glob", "**/" .. mapper_name, search_dir},
