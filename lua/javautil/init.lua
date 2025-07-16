@@ -298,7 +298,7 @@ end
 
 local function jump_to_file_line(filepath, linenr)
       vim.cmd("edit " .. filepath)
-      vim.api.nvim.win_set_cursor(0, { linenr, 0 } )
+      vim.api.nvim_win_set_cursor(0, { linenr, 0 } )
 end
 
 function M.jump_to_mapper_xml()
@@ -310,7 +310,7 @@ function M.jump_to_mapper_xml()
 
       Job:new({
             command = "rg",
-            args = { 'id="' .. method .. '"', "--glob", "**/" .. mapper_name, search_dir},
+            args = {'id="' .. method .. '"', "--files-with-matches", "--glob", "**/" .. mapper_name, search_dir},
             on_exit = function(j, return_val)
                   local result = j:result()
                   vim.schedule(function()
