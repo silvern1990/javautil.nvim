@@ -286,7 +286,7 @@ end
 local function find_in_file(path, pattern)
       local match_line = nil
 
-      for linenr, line in ipairs(vim.fn.readfile(Path:new(root_dir, path).absolute())) do
+      for linenr, line in ipairs(vim.fn.readfile(Path:new(root_dir, path):absolute())) do
             if line:find(pattern, 1, true) then
                   match_line = linenr
                   break
