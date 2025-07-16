@@ -277,6 +277,25 @@ function M.makeRequestMapping()
 end
 
 
+
+local function find_in_file(path, pattern)
+      local match_line = nil
+
+      for linenr, line in ipairs(vim.fn.readfile(path)) do
+            if line:find(pattern, 1, true) then
+                  match_line = linenr
+                  break
+            end
+      end
+
+      return match_line
+end
+
+local function jump_to_file_line(filepath, linenr)
+      vim.cmd("edit " .. filepath)
+      vim.api.nvim.win_set_cursor(0, { linenr, 0 } )
+end
+
 function M.jump_to_mapper_xml()
       local current_file = vim.fn.expand("%:t")
       local method = vim.fn.expand("<cword>")
@@ -284,11 +303,28 @@ function M.jump_to_mapper_xml()
       local mapper_name = current_file:gsub(".java", ".xml")
       local search_dir = "src/main/resources"
 
-      require("telescope.builtin").grep_string({
-            search = 'id="' .. method .. '"',
-            search_dirs = { search_dir },
-            prompt_title = "Mybatis XML Jump",
-      })
+      Job:new({
+            command = "rg",
+            args = { 'id="' .. method .. '"', "--glob", "**/" .. mapper_name, search_dir},
+            on_exit = function(j, return_val)
+                  local result = j:result()
+                  vim.schedule(function()
+                        if #result == 1 then
+                              local filepath = result[1]
+                              local linenr = find_in_file(filepath, 'id="' .. method .. '"') or 1
+                              jump_to_file_line(filepath, linenr)
+                        elseif #result > 1 then
+                              require("telescope.builtin").grep_string({
+                                    search = 'id="' .. method .. '"',
+                                    search_dirs = { search_dir },
+                                    prompt_title = "Mybatis XML Jump",
+                              })
+                        else
+                              vim.notify("not found")
+                        end
+                  end)
+            end,
+      }):start()
 end
 
 
