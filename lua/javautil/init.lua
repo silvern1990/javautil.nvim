@@ -282,56 +282,89 @@ function M.makeRequestMapping()
 end
 
 
+-- search mapper.method call
+local function extract_mapper_call()
+      local line = vim.api.nvim_get_current_line()
+      local cursor_col = vim.api.nvim_win_get_cursor(0)[2] + 1
 
-local function find_in_file(path, pattern)
-      local match_line = nil
-
-      for linenr, line in ipairs(vim.fn.readfile(Path:new(root_dir, path):absolute())) do
-            if line:find(pattern, 1, true) then
-                  match_line = linenr
-                  break
+      for obj, method, start_idx in line:gmatch("([%w_]+)%.([%w_]+)%s*%(") do
+            local match_col = line:find(obj .. "." .. method, 1, true)
+            vim.notify(obj .. "." .. method)
+            if match_col and cursor_col >= match_col and cursor_col <= match_col + #obj + #method + 1 then
+                  return obj, method
             end
       end
 
-      return match_line
+      return nil, nil
 end
 
-local function jump_to_file_line(filepath, linenr)
-      vim.cmd("edit " .. filepath)
-      vim.api.nvim_win_set_cursor(0, { linenr, 0 } )
-      vim.cmd('normal! zz')
+-- search mapper type in current buffer
+local function find_mapper_type(var_name)
+      local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+      for _, line in ipairs(lines) do
+            local type_, var = line:match("([%w_]+)%s+([%w_]+)%s*;")
+            if type_ and var == var_name then
+                  return type_
+            end
+
+            local type2, var2 = line:match("([%w_]+)%s+([%w_]+)%s*=")
+            if type2 and var2 == var_name then
+                  return type2
+            end
+      end
+      return nil
 end
 
-function M.jump_to_mapper_xml()
-      local current_file = vim.fn.expand("%:t")
-      local method = vim.fn.expand("<cword>")
-
-      local mapper_name = current_file:gsub(".java", ".xml")
+local function jump_to_xml(mapper_type, method_id)
+      local file_name = mapper_type .. ".xml"
       local search_dir = "src/main/resources"
 
       Job:new({
             command = "rg",
-            args = {'id="' .. method .. '"', "--files-with-matches", "--glob", "**/" .. mapper_name, search_dir},
-            on_exit = function(j, return_val)
+            args = { 'id="' .. method_id .. '"', "--files-with-matches", "--glob", "**/" .. file_name, search_dir }, 
+            on_exit = function(j, code)
                   local result = j:result()
                   vim.schedule(function()
-                        if #result == 1 then
-                              local filepath = result[1]
-                              local linenr = find_in_file(filepath, 'id="' .. method .. '"') or 1
-                              jump_to_file_line(filepath, linenr)
-                        elseif #result > 1 then
-                              require("telescope.builtin").grep_string({
-                                    search = 'id="' .. method .. '"',
-                                    search_dirs = { search_dir },
-                                    prompt_title = "Mybatis XML Jump",
-                              })
-                        else
-                              vim.notify("not found")
+                        if #result == 0 then
+                              vim.notify("definition not found")
+                              return
                         end
+
+                        local filepath = result[1]
+                        local lines = vim.fn.readfile(filepath)
+                        for i, line in ipairs(lines) do
+                              if line:find('id="' .. method_id .. '"', 1, true) then
+                                    vim.cmd("edit " .. filepath)
+                                    vim.api.nvim_win_set_cursor(0, { i, 0 })
+                                    vim.cmd("normal! zz")
+                                    return
+                              end
+                        end
+                        vim.cmd("edit " .. filepath)
+                        vim.api.nvim_win_set_cursor(0, { 1, 0 })
                   end)
-            end,
+            end
       }):start()
 end
+
+function M.jump_to_mapper_xml()
+      local obj, method = extract_mapper_call()
+      if not obj or not method then
+            local current_file = vim.fn.expand("%:t")
+            method = vim.fn.expand("<cword>")
+            jump_to_xml(current_file:gsub("%.java", ""), method)
+            return
+      end
+
+      local mapper_type = find_mapper_type(obj)
+      if not mapper_type then
+            print("mapper Type not found: " .. obj)
+            return
+      end
+
+      jump_to_xml(mapper_type, method)
+end
+
 
 
 return M
