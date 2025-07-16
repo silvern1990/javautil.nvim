@@ -303,6 +303,7 @@ function M.jump_to_mapper_xml()
       local mapper_name = current_file:gsub(".java", ".xml")
       local search_dir = "src/main/resources"
 
+      local Job = require("plenary.job")
       Job:new({
             command = "rg",
             args = { 'id="' .. method .. '"', "--glob", "**/" .. mapper_name, search_dir},
