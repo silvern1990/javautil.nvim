@@ -1,5 +1,7 @@
 local M = {}
 
+local endpoint_index = {}
+
 local root_dir = require("jdtls.setup").find_root({"mvnw", "gradlew", "pom.xml", "build.gradle"})
 
 local Job = require("plenary.job")
@@ -365,6 +367,103 @@ function M.jump_to_mapper_xml()
       jump_to_xml(mapper_type, method)
 end
 
+local function find_endpoint_on_treesitter(bufnr, endpoint)
 
+      local ts = vim.treesitter
+      local parser = ts.get_parser(bufnr, "java")
+      local tree = parser:parse()[1]
+      local root = tree:root()
+
+      local query = ts.query.parse("java", [[
+            (method_declaration
+                  modifiers: (modifiers)
+            ) @method.definition
+      ]])
+
+      for _, match in query:iter_matches(root, bufnr) do
+            local captures = {}
+            for id, node in pairs(match) do
+                  captures[query.captures[id]] = node
+            end
+
+            local url_node = captures["url"]
+            if url_node then
+                  local text = vim.treesitter.get_node_text(url_node, bufnr)
+                  text = text:gsub('^"', ""):gsub('"$', "")
+
+                  if text == endpoint then
+                        local method = captures["method"]
+                        local row, col = method:start()
+                        return {row=row, col=col}
+                  end
+            end
+      end
+end
+
+local function find_controller_file(endpoint)
+
+      if endpoint_index[endpoint] then
+            return endpoint_index[endpoint]
+      end
+
+      local files = vim.fn.glob("**/controller/*.java", false, true)
+
+      for _, file in ipairs(files) do
+            local bufnr = vim.fn.bufadd(file)
+            vim.fn.bufload(bufnr)
+
+            local status, result = pcall(find_endpoint_on_treesitter, bufnr, endpoint)
+
+            if not status then
+                  goto continue_loop
+            end
+
+            vim.print(result)
+
+            if not result then
+                  return
+            end
+
+            local row, col = unpack(result)
+
+            if row then
+                  return {
+                        file = file,
+                        row = row,
+                        col = col,
+                  }
+            end
+
+            ::continue_loop::
+      end
+
+end
+
+function M.jump_to_endpoint()
+      local line = vim.api.nvim_get_current_line()
+      local endpoint = line:match('"([^"]+%.do)"')
+
+      if not endpoint then
+            vim.notify("Not found endpoint.")
+            return
+      end
+
+      local position_info = find_controller_file(endpoint)
+
+      if not position_info then
+            vim.notify("Not found position")
+            return
+      end
+
+      local file, row, col = unpack(position_info)
+
+      vim.cmd("edit " .. file)
+
+      if row then
+            vim.api.nvim_win_set_cursor(0, { row + 1, col })
+      else
+            vim.notify("Endpoint not found (Tree-sitter)")
+      end
+end
 
 return M
