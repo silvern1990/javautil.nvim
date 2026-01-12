@@ -367,17 +367,28 @@ function M.jump_to_mapper_xml()
       jump_to_xml(mapper_type, method)
 end
 
-local function find_endpoint_on_treesitter(bufnr, endpoint)
+
+local function find_endpoint(bufnr, base_url, url)
 
       local ts = vim.treesitter
       local parser = ts.get_parser(bufnr, "java")
       local tree = parser:parse()[1]
       local root = tree:root()
 
+
       local query = ts.query.parse("java", [[
-            (method_declaration
-                  modifiers: (modifiers)
-            ) @method.definition
+      (method_declaration
+            (modifiers
+                  (annotation
+                        name: (identifier) @annotation_name
+                        arguments: (annotation_argument_list
+                              (string_literal
+                                    (string_fragment) @url
+                              )
+                        )
+                  )
+            )
+      ) @method
       ]])
 
       for _, match in query:iter_matches(root, bufnr) do
@@ -386,84 +397,140 @@ local function find_endpoint_on_treesitter(bufnr, endpoint)
                   captures[query.captures[id]] = node
             end
 
-            local url_node = captures["url"]
-            if url_node then
-                  local text = vim.treesitter.get_node_text(url_node, bufnr)
-                  text = text:gsub('^"', ""):gsub('"$', "")
+            local annotation_list = {
+                  RequestMapping = true,
+                  PostMapping = true,
+                  GetMapping = true,
+                  PutMapping = true,
+                  UpdateMapping = true,
+                  DeleteMapping = true
+            }
 
-                  if text == endpoint then
-                        local method = captures["method"]
-                        local row, col = method:start()
-                        return {row=row, col=col}
-                  end
-            end
-      end
-end
+            local annotation = ts.get_node_text(captures['annotation_name'][1], bufnr)
 
-local function find_controller_file(endpoint)
 
-      if endpoint_index[endpoint] then
-            return endpoint_index[endpoint]
-      end
-
-      local files = vim.fn.glob("**/controller/*.java", false, true)
-
-      for _, file in ipairs(files) do
-            local bufnr = vim.fn.bufadd(file)
-            vim.fn.bufload(bufnr)
-
-            local status, result = pcall(find_endpoint_on_treesitter, bufnr, endpoint)
-
-            if not status then
-                  goto continue_loop
+            if not annotation_list[annotation] then
+                  goto end_cycle
             end
 
-            vim.print(result)
+            local annotation_value = ts.get_node_text(captures["url"][1], bufnr)
 
-            if not result then
-                  return
-            end
-
-            local row, col = unpack(result)
-
-            if row then
+            if annotation_value == url then
+                  local method = captures["method"][1]
+                  local sr, sc = method:range()
                   return {
-                        file = file,
-                        row = row,
-                        col = col,
+                        row = sr,
+                        col = sc
                   }
             end
 
-            ::continue_loop::
+            ::end_cycle::
+      end
+end
+
+local function find_controller(bufnr, endpoint) 
+
+      local ts = vim.treesitter
+      local parser = ts.get_parser(bufnr, "java")
+      local tree = parser:parse()[1]
+      local root = tree:root()
+
+
+      local query = ts.query.parse("java", [[
+      (class_declaration
+            (modifiers
+                  (annotation
+                        name: (identifier) @annotation_name
+                        arguments: (annotation_argument_list
+                              (string_literal
+                                    (string_fragment) @url
+                              )
+                        )
+                  )
+            )
+      )
+      ]])
+
+      for _, match in query:iter_matches(root, bufnr) do
+            local captures = {}
+            for id, node in pairs(match) do
+                  captures[query.captures[id]] = node
+            end
+
+
+            local annotation_name = ts.get_node_text(captures["annotation_name"][1], bufnr)
+
+            if annotation_name ~= 'RequestMapping' then
+                  goto end_cycle
+            end
+
+
+            local class_url = captures["url"]
+
+            local base_url = vim.treesitter.get_node_text(class_url[1], bufnr)
+
+            local matched = endpoint:sub(1, #base_url)
+
+            if matched == base_url then
+                  return find_endpoint(bufnr, base_url, endpoint:sub(#base_url+1))
+            end
+            ::end_cycle::
+      end
+
+      return nil
+end
+
+local function jump_to_endpoint(endpoint)
+      local files = vim.fn.glob("**/controller/*.java", false, true)
+
+
+      for _, file in ipairs(files) do
+
+            local bufnr = vim.fn.bufadd(file)
+            vim.fn.bufload(bufnr)
+
+            local result = find_controller(bufnr, endpoint)
+
+            if result then
+                  return {
+                        file = file,
+                        row = result.row,
+                        col = result.col,
+                  }
+            end
       end
 
 end
 
-function M.jump_to_endpoint()
+function M.jump_to_endpoint_handler()
       local line = vim.api.nvim_get_current_line()
       local endpoint = line:match('"([^"]+%.do)"')
+
+      -- caching
+      if endpoint_index[endpoint] then
+            local position_info = endpoint_index[endpoint]
+            vim.cmd("edit " .. position_info.file)
+            vim.api.nvim_win_set_cursor(0, { position_info.row + 1, position_info.col })
+            return
+      end
+
 
       if not endpoint then
             vim.notify("Not found endpoint.")
             return
       end
 
-      local position_info = find_controller_file(endpoint)
+      local position_info = jump_to_endpoint(endpoint)
 
       if not position_info then
             vim.notify("Not found position")
             return
       end
 
-      local file, row, col = unpack(position_info)
+      endpoint_index[endpoint] = position_info
 
-      vim.cmd("edit " .. file)
-
-      if row then
-            vim.api.nvim_win_set_cursor(0, { row + 1, col })
-      else
-            vim.notify("Endpoint not found (Tree-sitter)")
-      end
+      vim.cmd("edit " .. position_info.file)
+      vim.api.nvim_win_set_cursor(0, { position_info.row + 1, position_info.col })
 end
 
 return M
