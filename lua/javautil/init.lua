@@ -503,7 +503,8 @@ end
 
 function M.jump_to_endpoint_handler()
       local line = vim.api.nvim_get_current_line()
-      local endpoint = line:match('["\']([^"]+%.do)["\']')
+      local endpoint = line:match('["\'`]([^"]+%.do).*["\'`]')
+
 
       -- caching
       if endpoint_index[endpoint] then
