@@ -368,6 +368,41 @@ function M.jump_to_mapper_xml()
 end
 
 
+local function match_endpoint_url(pattern_url, actual_url)
+      -- Strip query parameters from actual_url
+      actual_url = actual_url:gsub("%?.*$", "")
+
+      -- Split both by /
+      local pattern_parts = {}
+      for part in pattern_url:gmatch("[^/]+") do
+            table.insert(pattern_parts, part)
+      end
+
+      local actual_parts = {}
+      for part in actual_url:gmatch("[^/]+") do
+            table.insert(actual_parts, part)
+      end
+
+      if #pattern_parts ~= #actual_parts then
+            return false
+      end
+
+      for i = 1, #pattern_parts do
+            local p = pattern_parts[i]
+            local a = actual_parts[i]
+
+            -- 한쪽이라도 url 조각이 path variable 인경우 일치하는 것으로 간주
+            local is_pattern_var = p:match("^{.+}$")
+            local is_actual_var = a:match("^%${.+}$") or a:match("^{.+}$")
+
+            if not is_pattern_var and not is_actual_var and p ~= a then
+                  return false
+            end
+      end
+
+      return true
+end
+
 local function find_endpoint(bufnr, base_url, url)
 
       local ts = vim.treesitter
@@ -415,7 +450,7 @@ local function find_endpoint(bufnr, base_url, url)
 
             local annotation_value = ts.get_node_text(captures["url"][1], bufnr)
 
-            if annotation_value == url then
+            if match_endpoint_url(annotation_value, url) then
                   local method = captures["method"][1]
                   local sr, sc = method:range()
                   return {
@@ -460,7 +495,7 @@ local function find_controller(bufnr, endpoint)
 
             local annotation_name = ts.get_node_text(captures["annotation_name"][1], bufnr)
 
-            if annotation_name ~= 'RequestMapping' then
+            if (annotation_name ~= 'RequestMapping') and (annotation_name ~= 'GetMapping') and (annotation_name ~= 'PostMapping') then
                   goto end_cycle
             end
 
@@ -503,8 +538,7 @@ end
 
 function M.jump_to_endpoint_handler()
       local line = vim.api.nvim_get_current_line()
-      local endpoint = line:match('["\'`]([^"]+%.do).*["\'`]')
-
+      local endpoint = line:match('["\'`]([^"]+).*["\'`]')
 
       -- caching
       if endpoint_index[endpoint] then
